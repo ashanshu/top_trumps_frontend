@@ -56,7 +56,9 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const isInGame = ref(false)
   const isWaitingForOpponent = ref(false)
   const playerDeck = ref<any[]>([])
-  const opponentDeck = ref<number>(0)
+  const opponentDeck = ref<any[]>([])
+  const playerDeckSize = ref<number>(0)
+  const opponentDeckSize = ref<number>(0)
   const currentRound = ref<number>(0)
   const gameResult = ref<any>(null)
 
@@ -124,6 +126,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
             data: message.data || message,
             timestamp: Date.now()
           }
+          console.log('Created wsMessage:', wsMessage)
+          console.log('wsMessage.data:', wsMessage.data)
           lastMessage.value = wsMessage
           messageHistory.value.push(wsMessage)
           handleIncomingMessage(wsMessage)
@@ -253,6 +257,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
       
       switch (gameData.action) {
         case 'start':
+          console.log('START action received with gameData:', gameData)
+          console.log('yourDeckSize:', gameData.yourDeckSize, 'opponentDeckSize:', gameData.opponentDeckSize)
           isInGame.value = true
           isWaitingForOpponent.value = false
           
@@ -268,6 +274,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
             
             // Create a deck with the specified size, showing the top card
             const deckSize = gameData.yourDeckSize || 1
+            console.log('Setting playerDeckSize to:', deckSize, 'from gameData.yourDeckSize:', gameData.yourDeckSize)
+            playerDeckSize.value = deckSize
             playerDeck.value = Array(deckSize).fill(null).map((_, index) => {
               if (index === 0) {
                 // First card is the revealed top card
@@ -284,8 +292,17 @@ export const useWebSocketStore = defineStore('websocket', () => {
               }
             })
             
-            // Store opponent info
-            opponentDeck.value = gameData.opponentDeckSize || 0
+            // Store opponent info - create placeholder deck
+            const opponentSize = gameData.opponentDeckSize || 0
+            console.log('Setting opponentDeckSize to:', opponentSize, 'from gameData.opponentDeckSize:', gameData.opponentDeckSize)
+            opponentDeckSize.value = opponentSize
+            opponentDeck.value = Array(opponentSize).fill(null).map((_, index) => ({
+              id: `opponent_hidden_${index}`,
+              name: `Opponent Card ${index + 1}`,
+              image: '❓',
+              attributes: {},
+              isHidden: true
+            }))
             
             console.log('Game started with server deck:', {
               playerCard,
@@ -293,6 +310,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
               opponentDeckSize: gameData.opponentDeckSize,
               yourTurn: gameData.yourTurn
             })
+            console.log('After setting - playerDeckSize.value:', playerDeckSize.value, 'opponentDeckSize.value:', opponentDeckSize.value)
           } else if (gameData.deck) {
             // Fallback to old format
             playerDeck.value = gameData.deck || []
@@ -301,10 +319,72 @@ export const useWebSocketStore = defineStore('websocket', () => {
           break
           
         case 'roundResult':
-          currentRound.value = gameData.round || 0
-          gameResult.value = gameData
-          opponentDeck.value = gameData.p2Deck || 0
+          console.log('Round result received:', gameData)
           
+          // Update player deck with new top card and size
+          if (gameData.yourTopCard && typeof gameData.yourDeckSize === 'number') {
+            playerDeckSize.value = gameData.yourDeckSize
+            
+            const newTopCard = {
+              id: `server_${Date.now()}`,
+              name: gameData.yourTopCard.Name,
+              image: gameData.yourTopCard.Image,
+              attributes: gameData.yourTopCard.Stats,
+              isHidden: false
+            }
+            
+            // Create new player deck with the new top card and remaining hidden cards
+            const newPlayerDeck = [newTopCard]
+            for (let i = 1; i < gameData.yourDeckSize; i++) {
+              newPlayerDeck.push({
+                id: `hidden_${i}`,
+                name: `Card ${i + 1}`,
+                image: '❓',
+                attributes: {},
+                isHidden: true
+              })
+            }
+            playerDeck.value = newPlayerDeck
+          }
+          
+          // Update opponent deck with new top card and size
+          if (gameData.opponentTopCard && typeof gameData.opponentDeckSize === 'number') {
+            opponentDeckSize.value = gameData.opponentDeckSize
+            
+            const newOpponentTopCard = {
+              id: `server_${Date.now()}_opponent`,
+              name: gameData.opponentTopCard.Name,
+              image: gameData.opponentTopCard.Image,
+              attributes: gameData.opponentTopCard.Stats,
+              isHidden: false
+            }
+            
+            // Create new opponent deck with the new top card and remaining hidden cards
+            const newOpponentDeck = [newOpponentTopCard]
+            for (let i = 1; i < gameData.opponentDeckSize; i++) {
+              newOpponentDeck.push({
+                id: `hidden_opponent_${i}`,
+                name: `Card ${i + 1}`,
+                image: '❓',
+                attributes: {},
+                isHidden: true
+              })
+            }
+            opponentDeck.value = newOpponentDeck
+          }
+          
+          // Update game state
+          currentRound.value = (currentRound.value || 0) + 1
+          isWaitingForOpponent.value = false
+          
+          // Store round result for display
+          gameResult.value = {
+            winner: gameData.winner,
+            round: currentRound.value,
+            gameOver: gameData.gameOver || ''
+          }
+          
+          // Check if game is over
           if (gameData.gameOver) {
             isInGame.value = false
             console.log('Game over:', gameData.gameOver)
@@ -338,6 +418,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     isWaitingForOpponent,
     playerDeck,
     opponentDeck,
+    playerDeckSize,
+    opponentDeckSize,
     currentRound,
     gameResult,
     

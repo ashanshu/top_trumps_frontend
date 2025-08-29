@@ -177,7 +177,16 @@ const gameStatus = computed(() => {
 const isMultiplayerMode = computed(() => websocketStore.isInGame && websocketStore.currentRoom)
 const isWaitingForOpponent = computed(() => websocketStore.isWaitingForOpponent)
 const multiplayerPlayerDeck = computed(() => websocketStore.playerDeck)
-const multiplayerOpponentDeck = computed(() => websocketStore.opponentDeck)
+const multiplayerPlayerDeckSize = computed(() => {
+  const size = websocketStore.playerDeckSize || 0
+  console.log('multiplayerPlayerDeckSize computed:', size, 'from websocketStore.playerDeckSize:', websocketStore.playerDeckSize)
+  return size
+})
+const multiplayerOpponentDeck = computed(() => {
+  const size = websocketStore.opponentDeckSize || 0
+  console.log('multiplayerOpponentDeck computed:', size, 'from websocketStore.opponentDeckSize:', websocketStore.opponentDeckSize)
+  return size
+})
 const multiplayerRoundResult = computed(() => websocketStore.gameResult)
 
 // Separate game state for multiplayer (don't interfere with AI mode)
@@ -491,22 +500,13 @@ watch(() => websocketStore.isInGame, (newValue) => {
 })
 
 watch(() => websocketStore.gameResult, (newValue) => {
-  if (newValue && newValue.action === 'roundResult') {
-    // Handle round result from server
-    currentRound.value = newValue.round || 1
-    roundResult.value = `${newValue.winner === 'player1' ? 'You win!' : 'Opponent wins!'} Round ${newValue.round}`
+  if (newValue && newValue.winner) {
+    // Handle round result from server (new format)
     isRoundComplete.value = true
-    
-    // Update deck counts
-    opponentDeck.value = newValue.p2Deck || 0
     
     if (newValue.gameOver) {
       isGameOver.value = true
-      if (newValue.p1Deck === 1) {
-        roundResult.value = '😔 You Lose! 😔'
-      } else if (newValue.p2Deck === 0) {
-        roundResult.value = '🎉 You Win! 🎉'
-      }
+      // Game over logic is now handled in the WebSocket store
     }
   }
 })
@@ -673,7 +673,7 @@ watch(() => websocketStore.gameResult, (newValue) => {
             </div>
             <div class="text-sm text-gray-600">
               {{ isMultiplayerMode 
-                ? `Cards: You ${multiplayerPlayerDeck.length} - Opponent ${multiplayerOpponentDeck}` 
+                ? `Cards: You ${multiplayerPlayerDeckSize} - Opponent ${multiplayerOpponentDeck}` 
                 : `Score: You ${playerScore} - ${opponentScore} AI` 
               }}
             </div>
@@ -691,7 +691,7 @@ watch(() => websocketStore.gameResult, (newValue) => {
               <h3 class="font-semibold text-yellow-800 mb-2">Round Result:</h3>
               <p class="text-yellow-700">
                 {{ isMultiplayerMode ? 
-                  (multiplayerRoundResult?.winner === 'player1' ? '🎉 You won this round!' : '😔 Opponent won this round!') : 
+                  (multiplayerRoundResult?.winner === websocketStore.playerName ? '🎉 You won this round!' : '😔 Opponent won this round!') : 
                   roundResult 
                 }}
               </p>
@@ -733,7 +733,7 @@ watch(() => websocketStore.gameResult, (newValue) => {
         <div class="bg-white rounded-lg shadow-lg p-6">
           <h2 class="text-xl font-semibold text-gray-800 mb-4 text-center">
             {{ isMultiplayerMode ? '👥 Opponent Pets' : '🤖 AI Pets' }} 
-            ({{ isMultiplayerMode ? multiplayerOpponentDeck : opponentDeck.length }})
+            ({{ isMultiplayerMode ? (multiplayerOpponentDeck || 0) : opponentDeck.length }})
           </h2>
           
           <!-- AI's Played Card -->
@@ -761,14 +761,33 @@ watch(() => websocketStore.gameResult, (newValue) => {
           <!-- AI Deck (Hidden) -->
           <div class="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
             <div
-              v-for="(card, index) in opponentDeck"
+              v-for="(card, index) in (isMultiplayerMode ? websocketStore.opponentDeck : opponentDeck)"
               :key="card.id"
-              class="p-3 bg-gray-100 rounded-lg border-2 border-gray-300"
+              class="p-3 rounded-lg border-2 transition-colors"
+              :class="{
+                'bg-red-50 border-red-300': !card.isHidden,
+                'bg-gray-100 border-gray-300': card.isHidden
+              }"
             >
               <div class="text-center">
-                <div class="text-2xl mb-1">❓</div>
-                <div class="text-sm font-medium text-gray-500">Hidden</div>
+                <div class="text-2xl mb-1">
+                  {{ card.isHidden ? '❓' : (card.image || '🐾') }}
+                </div>
+                <div class="text-sm font-medium" :class="card.isHidden ? 'text-gray-500' : 'text-gray-800'">
+                  {{ card.isHidden ? 'Hidden' : card.name }}
+                </div>
                 <div class="text-xs text-gray-400">Pet {{ index + 1 }}</div>
+                
+                <!-- Show attributes if card is revealed -->
+                <div v-if="!card.isHidden && card.attributes" class="mt-2 space-y-1">
+                  <div
+                    v-for="[attr, value] in Object.entries(card.attributes)"
+                    :key="attr"
+                    class="text-xs bg-white bg-opacity-50 rounded px-1"
+                  >
+                    {{ attr }}: {{ value }}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
