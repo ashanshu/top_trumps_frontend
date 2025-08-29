@@ -450,7 +450,7 @@ onMounted(() => {
               <h3 class="font-semibold text-lg">{{ selectedCard.name }}</h3>
               <div class="grid grid-cols-2 gap-2 mt-2">
                 <div
-                  v-for="(value, attr) in selectedCard.attributes"
+                  v-for="[attr, value] in Object.entries(selectedCard.attributes)"
                   :key="attr"
                   @click="selectAttribute(attr)"
                   class="p-2 rounded cursor-pointer transition-colors"
@@ -560,7 +560,7 @@ onMounted(() => {
               <h3 class="font-semibold text-lg">{{ opponentCard.name }}</h3>
               <div class="grid grid-cols-2 gap-2 mt-2">
                 <div
-                  v-for="(value, attr) in opponentCard.attributes"
+                  v-for="[attr, value] in Object.entries(opponentCard.attributes)"
                   :key="attr"
                   class="p-2 rounded"
                   :class="{
