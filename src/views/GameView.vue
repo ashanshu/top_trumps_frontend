@@ -15,15 +15,23 @@ const isGameOver = ref(false)
 const gameStarted = ref(false)
 
 // Card selection
-const selectedCard = ref<any>(null)
-const selectedAttribute = ref<string | null>(null)
-const opponentCard = ref<any>(null)
+const selectedCard = ref<PetCard | null>(null)
+const selectedAttribute = ref<string>('')
+const opponentCard = ref<PetCard | null>(null)
 const roundResult = ref<string | null>(null)
 const isPlayerTurn = ref(true)
 const isRoundComplete = ref(false)
 
+// Define card type
+interface PetCard {
+  id: string
+  name: string
+  image: string
+  attributes: Record<string, number>
+}
+
 // Enhanced card deck with 20 unique pet cards
-const allCards = [
+const allCards: PetCard[] = [
   {
     id: 'card_1',
     name: 'Golden Retriever',
@@ -146,11 +154,11 @@ const allCards = [
   }
 ]
 
-const playerDeck = ref<any[]>([])
-const opponentDeck = ref<any[]>([])
+const playerDeck = ref<PetCard[]>([])
+const opponentDeck = ref<PetCard[]>([])
 
 // Computed properties
-const canPlayCard = computed(() => selectedCard.value && selectedAttribute.value && isPlayerTurn.value)
+const canPlayCard = computed(() => selectedCard.value && selectedAttribute.value && selectedAttribute.value !== '' && isPlayerTurn.value)
 const gameStatus = computed(() => {
   if (isGameOver.value) {
     if (playerDeck.value.length === 0) return '🎉 You Win! 🎉'
@@ -180,7 +188,7 @@ const startGame = () => {
   
   // Reset selections
   selectedCard.value = null
-  selectedAttribute.value = null
+  selectedAttribute.value = ''
   opponentCard.value = null
   roundResult.value = null
   
@@ -192,10 +200,10 @@ const startGame = () => {
   }
 }
 
-const selectCard = (card: any) => {
+const selectCard = (card: PetCard) => {
   if (!isPlayerTurn.value || isRoundComplete.value) return
   selectedCard.value = card
-  selectedAttribute.value = null
+  selectedAttribute.value = ''
 }
 
 const selectAttribute = (attribute: string) => {
@@ -284,17 +292,17 @@ const playAITurn = () => {
 }
 
 const playCard = () => {
-  if (!canPlayCard.value || isRoundComplete.value) return
+  if (!canPlayCard.value || isRoundComplete.value || !selectedCard.value) return
   
   // AI selects a random card but MUST use the same attribute as the player
   const aiCardIndex = Math.floor(Math.random() * opponentDeck.value.length)
   const aiCard = opponentDeck.value[aiCardIndex]
-  const aiAttribute = selectedAttribute.value! // AI uses the SAME attribute as player
+  const aiAttribute = selectedAttribute.value // AI uses the SAME attribute as player
   
   opponentCard.value = aiCard
   
   // Compare attributes (now both using the same attribute)
-  const playerValue = selectedCard.value.attributes[selectedAttribute.value!]
+  const playerValue = selectedCard.value.attributes[selectedAttribute.value]
   const aiValue = aiCard.attributes[aiAttribute]
   
   let result: string
@@ -319,7 +327,7 @@ const playCard = () => {
   // Remove cards from decks
   if (winner === 'player') {
     // Player wins both cards
-    const playerCardIndex = playerDeck.value.findIndex(c => c.id === selectedCard.value.id)
+    const playerCardIndex = playerDeck.value.findIndex(c => c.id === selectedCard.value!.id)
     if (playerCardIndex > -1) {
       playerDeck.value.splice(playerCardIndex, 1)
     }
@@ -329,7 +337,7 @@ const playCard = () => {
     }
   } else if (winner === 'opponent') {
     // AI wins both cards
-    const playerCardIndex = playerDeck.value.findIndex(c => c.id === selectedCard.value.id)
+    const playerCardIndex = playerDeck.value.findIndex(c => c.id === selectedCard.value!.id)
     if (playerCardIndex > -1) {
       playerDeck.value.splice(playerCardIndex, 1)
     }
@@ -340,7 +348,7 @@ const playCard = () => {
   }
   // In case of tie, both cards are removed
   else {
-    const playerCardIndex = playerDeck.value.findIndex(c => c.id === selectedCard.value.id)
+    const playerCardIndex = playerDeck.value.findIndex(c => c.id === selectedCard.value!.id)
     if (playerCardIndex > -1) {
       playerDeck.value.splice(playerCardIndex, 1)
     }
@@ -364,7 +372,7 @@ const nextRound = () => {
   currentRound.value++
   isRoundComplete.value = false
   selectedCard.value = null
-  selectedAttribute.value = null
+  selectedAttribute.value = ''
   opponentCard.value = null
   roundResult.value = null
   // Alternate turns between rounds
@@ -447,8 +455,8 @@ onMounted(() => {
                   @click="selectAttribute(attr)"
                   class="p-2 rounded cursor-pointer transition-colors"
                   :class="{
-                    'bg-blue-500 text-white': selectedAttribute === attr,
-                    'bg-gray-100 hover:bg-gray-200': selectedAttribute !== attr
+                    'bg-blue-500 text-white': selectedAttribute && selectedAttribute === attr,
+                    'bg-gray-100 hover:bg-gray-200': !selectedAttribute || selectedAttribute !== attr
                   }"
                 >
                   <div class="text-xs font-medium">{{ attr }}</div>
@@ -479,7 +487,7 @@ onMounted(() => {
                 <div class="text-2xl mb-1">{{ card.image }}</div>
                 <div class="text-sm font-medium">{{ card.name }}</div>
                 <div class="text-xs text-gray-500">
-                  {{ Math.max(...Object.values(card.attributes)) }} max
+                  {{ Math.max(...Object.values(card.attributes as Record<string, number>)) }} max
                 </div>
               </div>
             </div>
@@ -556,8 +564,8 @@ onMounted(() => {
                   :key="attr"
                   class="p-2 rounded"
                   :class="{
-                    'bg-red-500 text-white': selectedAttribute === attr,
-                    'bg-gray-100': selectedAttribute !== attr
+                    'bg-red-500 text-white': selectedAttribute && selectedAttribute === attr,
+                    'bg-gray-100': !selectedAttribute || selectedAttribute !== attr
                   }"
                 >
                   <div class="text-xs font-medium">{{ attr }}</div>
