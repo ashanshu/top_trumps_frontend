@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useWebSocketStore } from '../stores/websocket'
 import { useGameStore } from '../stores/game'
@@ -13,10 +13,10 @@ const gameStore = useGameStore()
 //   websocketStore.connect()
 // })
 
-// Cleanup on component unmount
-onUnmounted(() => {
-  websocketStore.disconnect()
-})
+// Don't disconnect WebSocket when navigating - keep connection alive for multiplayer
+// onUnmounted(() => {
+//   websocketStore.disconnect()
+// })
 
 const handleConnect = () => {
   websocketStore.connect()
@@ -35,6 +35,22 @@ const handleSendTestMessage = () => {
       timestamp: new Date().toISOString()
     }
   })
+}
+
+const playerName = ref('')
+const showJoinRoom = ref(false)
+
+const handleJoinRoom = () => {
+  if (!playerName.value.trim()) {
+    alert('Please enter your name')
+    return
+  }
+  
+  if (websocketStore.joinRoom('room1', playerName.value.trim())) {
+    router.push('/game')
+  } else {
+    alert('Failed to join room. Please check your connection.')
+  }
 }
 
 const goToGame = () => {
@@ -133,8 +149,40 @@ const goToGame = () => {
             {{ websocketStore.isConnected ? 'Ready to play!' : 'Connect to server to start playing' }}
           </p>
           
-          <!-- Play with AI Button -->
+          <!-- Multiplayer Game Buttons -->
           <div v-if="websocketStore.isConnected" class="space-y-6">
+            <!-- Join Room 1 Button -->
+            <div class="space-y-4">
+              <div class="flex items-center space-x-4">
+                <input
+                  v-model="playerName"
+                  type="text"
+                  placeholder="Enter your name"
+                  class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  @keyup.enter="handleJoinRoom"
+                />
+                <button 
+                  @click="handleJoinRoom"
+                  :disabled="!playerName.trim()"
+                  class="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-lg font-bold rounded-lg hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                >
+                  🎮 Join Room 1
+                </button>
+              </div>
+              <p class="text-sm text-gray-500">Join multiplayer game and wait for an opponent!</p>
+            </div>
+            
+            <!-- Divider -->
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-300"></div>
+              </div>
+              <div class="relative flex justify-center text-sm">
+                <span class="px-2 bg-gray-50 text-gray-500">OR</span>
+              </div>
+            </div>
+            
+            <!-- Play with AI Button -->
             <button 
               @click="goToGame"
               class="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xl font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transform hover:scale-105 transition-all duration-200 shadow-lg"

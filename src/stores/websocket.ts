@@ -8,6 +8,38 @@ export interface WebSocketMessage {
   timestamp: number
 }
 
+export interface GameMessage {
+  action: string
+  room?: string
+  player?: string
+  card?: any
+  attribute?: string
+  deck?: any[]
+  round?: number
+  p1Card?: any
+  p2Card?: any
+  attr?: string
+  winner?: string
+  p1Deck?: number
+  p2Deck?: number
+  gameOver?: string
+  
+  // New server message format
+  opponentDeckSize?: number
+  opponentTopCard?: {
+    Name: string
+    Stats: Record<string, number>
+    Image: string
+  }
+  yourDeckSize?: number
+  yourTopCard?: {
+    Name: string
+    Stats: Record<string, number>
+    Image: string
+  }
+  yourTurn?: boolean
+}
+
 export const useWebSocketStore = defineStore('websocket', () => {
   const socket = ref<WebSocket | null>(null)
   const isConnected = ref(false)
@@ -17,6 +49,16 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const reconnectAttempts = ref(0)
   const maxReconnectAttempts = WEBSOCKET_CONFIG.MAX_RECONNECT_ATTEMPTS
   const reconnectDelay = WEBSOCKET_CONFIG.RECONNECT_DELAY
+  
+  // Game state
+  const currentRoom = ref<string>('')
+  const playerName = ref<string>('')
+  const isInGame = ref(false)
+  const isWaitingForOpponent = ref(false)
+  const playerDeck = ref<any[]>([])
+  const opponentDeck = ref<number>(0)
+  const currentRound = ref<number>(0)
+  const gameResult = ref<any>(null)
 
   // Computed properties
   const statusText = computed(() => {
@@ -75,8 +117,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
       socket.value.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
+          console.log('Raw message received:', message)
+          
           const wsMessage: WebSocketMessage = {
-            type: message.type || 'unknown',
+            type: message.type || 'game', // Default to 'game' if no type
             data: message.data || message,
             timestamp: Date.now()
           }
@@ -134,6 +178,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   function sendMessage(message: any) {
     if (socket.value?.readyState === WebSocket.OPEN) {
       try {
+        console.log('Sending WebSocket message:', message)
         socket.value.send(JSON.stringify(message))
         
         // Add sent message to history
@@ -144,13 +189,16 @@ export const useWebSocketStore = defineStore('websocket', () => {
         }
         messageHistory.value.push(sentMessage)
         
+        console.log('Message sent successfully')
         return true
       } catch (error) {
         console.error('Failed to send message:', error)
         return false
       }
+    } else {
+      console.error('WebSocket not open. State:', socket.value?.readyState)
+      return false
     }
-    return false
   }
 
   function clearMessageHistory() {
@@ -158,7 +206,113 @@ export const useWebSocketStore = defineStore('websocket', () => {
     lastMessage.value = null
   }
 
+  function joinRoom(room: string, player: string) {
+    console.log('joinRoom called with:', { room, player })
+    console.log('WebSocket state:', socket.value?.readyState)
+    
+    if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return false
+    }
+
+    currentRoom.value = room
+    playerName.value = player
+    isWaitingForOpponent.value = true
+    
+    const message: GameMessage = {
+      action: 'join',
+      room: room,
+      player: player
+    }
+    
+    console.log('Sending join message:', message)
+    const result = sendMessage(message)
+    console.log('Join message send result:', result)
+    return result
+  }
+
+  function playCard(cardName: string, attribute: string) {
+    if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket not connected')
+      return false
+    }
+
+    const message: GameMessage = {
+      action: 'playCard',
+      card: { name: cardName },
+      attribute: attribute
+    }
+    
+    return sendMessage(message)
+  }
+
   function handleIncomingMessage(message: WebSocketMessage) {
+    // Handle game-specific messages
+    if (message.type === 'game' && message.data) {
+      const gameData = message.data as GameMessage
+      
+      switch (gameData.action) {
+        case 'start':
+          isInGame.value = true
+          isWaitingForOpponent.value = false
+          
+          // Handle new server message format
+          if (gameData.yourTopCard) {
+            // Convert server format to our local format
+            const playerCard = {
+              id: `server_${Date.now()}`,
+              name: gameData.yourTopCard.Name,
+              image: gameData.yourTopCard.Image,
+              attributes: gameData.yourTopCard.Stats
+            }
+            
+            // Create a deck with the specified size, showing the top card
+            const deckSize = gameData.yourDeckSize || 1
+            playerDeck.value = Array(deckSize).fill(null).map((_, index) => {
+              if (index === 0) {
+                // First card is the revealed top card
+                return playerCard
+              } else {
+                // Other cards are hidden/placeholder cards
+                return {
+                  id: `hidden_${index}`,
+                  name: `Card ${index + 1}`,
+                  image: '❓',
+                  attributes: {},
+                  isHidden: true
+                }
+              }
+            })
+            
+            // Store opponent info
+            opponentDeck.value = gameData.opponentDeckSize || 0
+            
+            console.log('Game started with server deck:', {
+              playerCard,
+              deckSize: gameData.yourDeckSize,
+              opponentDeckSize: gameData.opponentDeckSize,
+              yourTurn: gameData.yourTurn
+            })
+          } else if (gameData.deck) {
+            // Fallback to old format
+            playerDeck.value = gameData.deck || []
+            console.log('Game started with deck:', gameData.deck)
+          }
+          break
+          
+        case 'roundResult':
+          currentRound.value = gameData.round || 0
+          gameResult.value = gameData
+          opponentDeck.value = gameData.p2Deck || 0
+          
+          if (gameData.gameOver) {
+            isInGame.value = false
+            console.log('Game over:', gameData.gameOver)
+          }
+          break
+      }
+    }
+    
     // Emit a custom event that other stores can listen to
     const customEvent = new CustomEvent('websocket-message', { 
       detail: message 
@@ -177,6 +331,16 @@ export const useWebSocketStore = defineStore('websocket', () => {
     messageHistory,
     reconnectAttempts,
     
+    // Game state
+    currentRoom,
+    playerName,
+    isInGame,
+    isWaitingForOpponent,
+    playerDeck,
+    opponentDeck,
+    currentRound,
+    gameResult,
+    
     // Computed
     statusText,
     statusColor,
@@ -186,6 +350,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     disconnect,
     sendMessage,
     clearMessageHistory,
+    joinRoom,
+    playCard,
     handleIncomingMessage
   }
 })
