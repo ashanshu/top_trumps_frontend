@@ -8,10 +8,10 @@ const router = useRouter()
 const websocketStore = useWebSocketStore()
 const gameStore = useGameStore()
 
-// Auto-connect on component mount
-onMounted(() => {
-  websocketStore.connect()
-})
+// Don't auto-connect - let users manually connect to the backend
+// onMounted(() => {
+//   websocketStore.connect()
+// })
 
 // Cleanup on component unmount
 onUnmounted(() => {
@@ -28,9 +28,12 @@ const handleDisconnect = () => {
 
 const handleSendTestMessage = () => {
   websocketStore.sendMessage({
-    type: 'ping',
-    data: { message: 'Hello from Top Trumps client!' },
-    timestamp: Date.now()
+    type: 'test',
+    data: { 
+      message: 'Hello from Top Trumps client!',
+      client: 'Vue.js Frontend',
+      timestamp: new Date().toISOString()
+    }
   })
 }
 

@@ -1,6 +1,6 @@
 export const WEBSOCKET_CONFIG = {
   // Default WebSocket server URL - change this to match your server
-  DEFAULT_URL: 'ws://localhost:8080',
+  DEFAULT_URL: 'ws://13.223.180.228:8080',
   
   // Reconnection settings
   MAX_RECONNECT_ATTEMPTS: 5,

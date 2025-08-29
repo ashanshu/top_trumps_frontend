@@ -452,7 +452,7 @@ onMounted(() => {
                 <div
                   v-for="[attr, value] in Object.entries(selectedCard.attributes)"
                   :key="attr"
-                  @click="selectAttribute(attr)"
+                  @click="selectAttribute(String(attr))"
                   class="p-2 rounded cursor-pointer transition-colors"
                   :class="{
                     'bg-blue-500 text-white': selectedAttribute && selectedAttribute === attr,

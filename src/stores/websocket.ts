@@ -53,22 +53,72 @@ export const useWebSocketStore = defineStore('websocket', () => {
 
     connectionStatus.value = 'connecting'
     
-    // Simulate connection for demo purposes
-    setTimeout(() => {
-      isConnected.value = true
-      connectionStatus.value = 'connected'
-      reconnectAttempts.value = 0
-      console.log('WebSocket connected (simulated)')
+    try {
+      socket.value = new WebSocket(url)
       
-      // Add a welcome message
-      const welcomeMessage: WebSocketMessage = {
-        type: 'system',
-        data: { message: 'Connected to Top Trumps server (demo mode)' },
-        timestamp: Date.now()
+      socket.value.onopen = () => {
+        isConnected.value = true
+        connectionStatus.value = 'connected'
+        reconnectAttempts.value = 0
+        console.log('WebSocket connected to:', url)
+        
+        // Add a welcome message
+        const welcomeMessage: WebSocketMessage = {
+          type: 'system',
+          data: { message: `Connected to Top Trumps server at ${url}` },
+          timestamp: Date.now()
+        }
+        lastMessage.value = welcomeMessage
+        messageHistory.value.push(welcomeMessage)
       }
-      lastMessage.value = welcomeMessage
-      messageHistory.value.push(welcomeMessage)
-    }, 1000)
+      
+      socket.value.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          const wsMessage: WebSocketMessage = {
+            type: message.type || 'unknown',
+            data: message.data || message,
+            timestamp: Date.now()
+          }
+          lastMessage.value = wsMessage
+          messageHistory.value.push(wsMessage)
+          handleIncomingMessage(wsMessage)
+        } catch (error) {
+          console.error('Failed to parse WebSocket message:', error)
+        }
+      }
+      
+      socket.value.onclose = (event) => {
+        isConnected.value = false
+        connectionStatus.value = 'disconnected'
+        console.log('WebSocket disconnected:', event.code, event.reason)
+        
+        // Add disconnect message
+        const disconnectMessage: WebSocketMessage = {
+          type: 'system',
+          data: { message: 'Disconnected from server' },
+          timestamp: Date.now()
+        }
+        messageHistory.value.push(disconnectMessage)
+      }
+      
+      socket.value.onerror = (error) => {
+        connectionStatus.value = 'error'
+        console.error('WebSocket error:', error)
+        
+        // Add error message
+        const errorMessage: WebSocketMessage = {
+          type: 'system',
+          data: { message: 'Connection error occurred' },
+          timestamp: Date.now()
+        }
+        messageHistory.value.push(errorMessage)
+      }
+      
+    } catch (error) {
+      connectionStatus.value = 'error'
+      console.error('Failed to create WebSocket connection:', error)
+    }
   }
 
   function disconnect() {
@@ -78,13 +128,27 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
     isConnected.value = false
     connectionStatus.value = 'disconnected'
-    console.log('WebSocket disconnected (simulated)')
+    console.log('WebSocket disconnected')
   }
 
   function sendMessage(message: any) {
     if (socket.value?.readyState === WebSocket.OPEN) {
-      socket.value.send(JSON.stringify(message))
-      return true
+      try {
+        socket.value.send(JSON.stringify(message))
+        
+        // Add sent message to history
+        const sentMessage: WebSocketMessage = {
+          type: 'sent',
+          data: message,
+          timestamp: Date.now()
+        }
+        messageHistory.value.push(sentMessage)
+        
+        return true
+      } catch (error) {
+        console.error('Failed to send message:', error)
+        return false
+      }
     }
     return false
   }
