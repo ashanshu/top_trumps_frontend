@@ -22,6 +22,8 @@ const handleConnect = () => {
   let serverUrl
   if (selectedServer.value === 'local') {
     serverUrl = 'ws://localhost:8080/ws'
+  } else if (selectedServer.value === 'localIP') {
+    serverUrl = 'ws://10.8.183.4:8080/ws'
   } else {
     serverUrl = 'ws://13.223.180.228:8080'
   }
@@ -101,7 +103,11 @@ const goToGame = () => {
             <!-- Current Server Display -->
             <div v-if="websocketStore.isConnected" class="text-sm text-gray-600">
               <span class="font-medium">Server:</span> 
-              {{ selectedServer === 'local' ? 'localhost:8080' : '13.223.180.228:8080' }}
+              {{ 
+                selectedServer === 'local' ? 'localhost:8080' : 
+                selectedServer === 'localIP' ? '10.8.183.4:8080' : 
+                '13.223.180.228:8080' 
+              }}
             </div>
           </div>
           
@@ -118,6 +124,16 @@ const goToGame = () => {
                   :disabled="websocketStore.isConnected"
                 />
                 <span class="text-sm">Local (localhost:8080)</span>
+              </label>
+              <label class="flex items-center">
+                <input 
+                  type="radio" 
+                  v-model="selectedServer" 
+                  value="localIP" 
+                  class="mr-2"
+                  :disabled="websocketStore.isConnected"
+                />
+                <span class="text-sm">Local IP (10.8.183.4:8080)</span>
               </label>
               <label class="flex items-center">
                 <input 

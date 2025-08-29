@@ -15,4 +15,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    host: '10.8.183.4', // Bind to specific IP address
+    port: 5173,         // Use port 5173
+    strictPort: true,   // Fail if port is already in use
+    open: false,        // Don't auto-open browser
+  },
 })
