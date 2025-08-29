@@ -1,38 +1,22 @@
+/* Import base styles first */
+@import './base.css';
+
+/* Tailwind CSS directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import './base.css';
-
+/* Custom styles for Top Trumps game */
 #app {
   width: 100%;
   margin: 0 auto;
   font-weight: normal;
 }
 
-a,
-.green {
-  text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
-}
-
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
-}
-
+/* Remove conflicting grid layout that interferes with game */
 @media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
-
   #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+    display: block;
+    padding: 0;
   }
 }
