@@ -19,7 +19,14 @@ const gameStore = useGameStore()
 // })
 
 const handleConnect = () => {
-  websocketStore.connect()
+  let serverUrl
+  if (selectedServer.value === 'local') {
+    serverUrl = 'ws://localhost:8080/ws'
+  } else {
+    serverUrl = 'ws://13.223.180.228:8080'
+  }
+  console.log('Connecting to server:', serverUrl)
+  websocketStore.connect(serverUrl)
 }
 
 const handleDisconnect = () => {
@@ -37,6 +44,7 @@ const handleSendTestMessage = () => {
   })
 }
 
+const selectedServer = ref('production') // Default to production server
 const playerName = ref('')
 const showJoinRoom = ref(false)
 
@@ -89,6 +97,38 @@ const goToGame = () => {
               <span class="font-medium" :class="websocketStore.statusColor">
                 {{ websocketStore.statusText }}
               </span>
+            </div>
+            <!-- Current Server Display -->
+            <div v-if="websocketStore.isConnected" class="text-sm text-gray-600">
+              <span class="font-medium">Server:</span> 
+              {{ selectedServer === 'local' ? 'localhost:8080' : '13.223.180.228:8080' }}
+            </div>
+          </div>
+          
+          <!-- Server Selection -->
+          <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Select Server:</label>
+            <div class="flex space-x-3">
+              <label class="flex items-center">
+                <input 
+                  type="radio" 
+                  v-model="selectedServer" 
+                  value="local" 
+                  class="mr-2"
+                  :disabled="websocketStore.isConnected"
+                />
+                <span class="text-sm">Local (localhost:8080)</span>
+              </label>
+              <label class="flex items-center">
+                <input 
+                  type="radio" 
+                  v-model="selectedServer" 
+                  value="production" 
+                  class="mr-2"
+                  :disabled="websocketStore.isConnected"
+                />
+                <span class="text-sm">Production (13.223.180.228:8080)</span>
+              </label>
             </div>
           </div>
           
